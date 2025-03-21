@@ -108,4 +108,103 @@ Principais recursos usados nesta demonstração:
 - Envio de comandos de impressão para uma impressora
 - Desconexão adequada do serviço
 
-Para uso mais avançado, consulte a [documentação da API do QZ Tray](https://qz.io/api/). 
+Para uso mais avançado, consulte a [documentação da API do QZ Tray](https://qz.io/api/).
+
+# QZ Tray Integration
+
+This project demonstrates two approaches to integrating QZ Tray for printing:
+
+1. **Frontend-only integration (insecure)** - Private key is stored in the frontend
+2. **Backend + Frontend integration (secure)** - Private key is stored securely on the backend
+
+## Security Concerns
+
+The original implementation (`src/qz-tray-service.ts`) has a significant security vulnerability:
+- The private key used for signing QZ Tray commands is stored and used directly in the frontend
+- This exposes the private key to anyone who can view your source code or network traffic
+- Anyone with the private key can impersonate your application to QZ Tray
+
+## Secure Solution
+
+The secure implementation moves the sensitive operations to a Laravel backend:
+- `qz-tray-backend/` - Laravel backend application that handles certificate storage and data signing
+- `src/qz-tray-service-secure.ts` - Updated frontend implementation that uses the backend for signing
+
+### Benefits of the Secure Solution
+
+- Private key never leaves the server
+- Signing operations happen server-side
+- CORS protection limits which domains can access the signing API
+- Easily configurable via environment variables
+
+## Setup Instructions
+
+### Backend (Secure Implementation)
+
+1. Navigate to the backend directory
+   ```bash
+   cd qz-tray-backend
+   ```
+
+2. Install PHP dependencies
+   ```bash
+   composer install
+   ```
+
+3. Set up environment variables
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+4. Add your QZ Tray certificates to `storage/app/certs/superfast/`:
+   - `cert.pem` - The public certificate
+   - `key.pem` - The private key
+
+5. Start the backend server
+   ```bash
+   php artisan serve
+   ```
+
+### Frontend
+
+Choose which implementation to use by importing from the appropriate file:
+
+#### For the insecure frontend-only approach:
+```javascript
+import { initQzTray, getPrinters, printTestPage, disconnectQzTray } from './qz-tray-service';
+```
+
+#### For the secure backend+frontend approach:
+```javascript
+import { initQzTray, getPrinters, printTestPage, disconnectQzTray } from './qz-tray-service-secure';
+```
+
+## Implementation Differences
+
+### Original Implementation (Insecure)
+- Loads certificate and private key directly from frontend
+- Uses JSRSASign for frontend signing
+- All sensitive operations happen client-side
+
+### Secure Implementation
+- Retrieves certificate from backend API
+- Sends data to backend API for signing
+- Private key never exposed to the frontend
+
+## How to Switch Between Implementations
+
+To migrate from the insecure to secure approach:
+
+1. Set up the Laravel backend as described above
+2. Update your imports to use `qz-tray-service-secure.ts` instead of `qz-tray-service.ts`
+3. No other code changes should be necessary as both implementations expose the same API
+
+## API Reference
+
+Both implementations provide the same functions:
+
+- `initQzTray()` - Connect to QZ Tray
+- `getPrinters()` - Get list of available printers
+- `printTestPage(printerName)` - Print a test page to the specified printer
+- `disconnectQzTray()` - Disconnect from QZ Tray 
