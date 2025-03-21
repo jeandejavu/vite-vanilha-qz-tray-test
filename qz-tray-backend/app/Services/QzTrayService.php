@@ -4,17 +4,30 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class QzTrayService
 {
     private $privateKeyPath;
     private $certificatePath;
+    private $disk;
 
     public function __construct()
     {
         $this->privateKeyPath = Config::get('qztray.certificates.private_key', 'certs/superfast/key.pem');
         $this->certificatePath = Config::get('qztray.certificates.certificate', 'certs/superfast/cert.pem');
+        $this->disk = Storage::disk('local'); // Explicitly use local disk
+
+        Log::info('QzTrayService initialized', [
+            'privateKeyPath' => $this->privateKeyPath,
+            'certificatePath' => $this->certificatePath,
+            'privateKeyExists' => $this->disk->exists($this->privateKeyPath),
+            'certificateExists' => $this->disk->exists($this->certificatePath),
+            'diskRoot' => $this->disk->path(''),
+            'fullPrivateKeyPath' => $this->disk->path($this->privateKeyPath),
+            'fullCertificatePath' => $this->disk->path($this->certificatePath)
+        ]);
     }
 
     /**
@@ -28,12 +41,17 @@ class QzTrayService
     {
         try {
             // Check if private key exists
-            if (!Storage::exists($this->privateKeyPath)) {
+            if (!$this->disk->exists($this->privateKeyPath)) {
+                Log::error('Private key not found', [
+                    'path' => $this->privateKeyPath,
+                    'fullPath' => $this->disk->path($this->privateKeyPath),
+                    'filesInCertsFolder' => $this->disk->files('certs/superfast')
+                ]);
                 throw new Exception('Private key not found');
             }
 
             // Get private key contents
-            $privateKey = Storage::get($this->privateKeyPath);
+            $privateKey = $this->disk->get($this->privateKeyPath);
 
             // Create signature
             $signature = null;
@@ -57,7 +75,7 @@ class QzTrayService
             return base64_encode($signature);
         } catch (Exception $e) {
             // Log the error
-            logger()->error('Error signing data: ' . $e->getMessage());
+            Log::error('Error signing data: ' . $e->getMessage());
 
             // Re-throw for controller to handle
             throw $e;
@@ -71,8 +89,28 @@ class QzTrayService
      */
     public function getCertificate(): ?string
     {
-        if (Storage::exists($this->certificatePath)) {
-            return Storage::get($this->certificatePath);
+        // List files in the directory for debugging
+        $filesInDir = $this->disk->files('certs/superfast');
+        Log::info('Files in certs directory', [
+            'certificatePath' => $this->certificatePath,
+            'filesInDir' => $filesInDir,
+            'exists' => $this->disk->exists($this->certificatePath),
+            'fullPath' => $this->disk->path($this->certificatePath)
+        ]);
+
+        if ($this->disk->exists($this->certificatePath)) {
+            return $this->disk->get($this->certificatePath);
+        }
+
+        // Try to directly access the file as a fallback
+        try {
+            $fullPath = $this->disk->path($this->certificatePath);
+            if (file_exists($fullPath)) {
+                Log::info('Found certificate using file_exists', ['path' => $fullPath]);
+                return file_get_contents($fullPath);
+            }
+        } catch (Exception $e) {
+            Log::error('Error accessing certificate directly: ' . $e->getMessage());
         }
 
         return null;
