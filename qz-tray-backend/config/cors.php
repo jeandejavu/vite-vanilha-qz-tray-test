@@ -19,8 +19,12 @@ return [
 
     'allowed_methods' => ['*'],
 
+    // In development, you might want to allow all origins
+    'allowed_origins' => ['*'],
+
+    // Or if you want to be more specific (use this in production)
     'allowed_origins' => array_merge(
-        ['http://localhost:3000', 'http://localhost:8000', 'http://127.0.0.1:5173'],
+        ['http://localhost:3000', 'http://localhost:8000', 'http://127.0.0.1:5173', 'http://localhost:5173'],
         config('qztray.allowed_origins', [])
     ),
 
@@ -32,6 +36,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true,
+    'supports_credentials' => false, // Set to false if you're not using cookies or authentication for API
 
 ];
