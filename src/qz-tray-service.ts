@@ -6,11 +6,11 @@ import jsrsasign from 'jsrsasign';
 async function loadCertificates() {
   try {
     // Carregar o certificado digital
-    const certificateResponse = await fetch('/cert/digital-certificate.txt');
+    const certificateResponse = await fetch('/cert/superfast/cert.pem');
     const certificate = await certificateResponse.text();
     
     // Carregar a chave privada
-    const privateKeyResponse = await fetch('/cert/private-key.pem');
+    const privateKeyResponse = await fetch('/cert/superfast/key.pem');
     const privateKey = await privateKeyResponse.text();
     
     return { certificate, privateKey };
